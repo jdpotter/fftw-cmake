@@ -16,6 +16,7 @@ option (BUILD_TESTS "Build tests" ON)
 option (ENABLE_OPENMP "Use OpenMP for multithreading" OFF)
 option (ENABLE_THREADS "Use pthread for multithreading" OFF)
 option (WITH_COMBINED_THREADS "Merge thread library" OFF)
+option (ENABLE_MPI "Use mpi" OFF)
 
 option (ENABLE_FLOAT "single-precision" OFF)
 option (ENABLE_LONG_DOUBLE "long-double precision" OFF)
@@ -116,6 +117,13 @@ if (OPENMP_FOUND)
   set (HAVE_OPENMP TRUE)
 endif ()
 
+if (ENABLE_MPI)
+  find_package (MPI)
+endif ()
+if (MPI_FOUND)
+  set (HAVE_MPI TRUE)
+endif ()
+
 include (CheckCCompilerFlag)
 
 if (ENABLE_SSE)
@@ -206,6 +214,9 @@ file(GLOB           fftw_reodft_SOURCE              reodft/*.c          reodft/*
 file(GLOB           fftw_simd_support_SOURCE        simd-support/*.c    simd-support/*.h)
 file(GLOB           fftw_libbench2_SOURCE           libbench2/*.c       libbench2/*.h)
 list (REMOVE_ITEM   fftw_libbench2_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/libbench2/useropt.c)
+
+file(GLOB           fftw_mpi_SOURCE                 mpi/*.c)
+list (REMOVE_ITEM   fftw_mpi_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/mpi/mpi-bench.c)
 
 set(SOURCEFILES
     ${fftw_api_SOURCE}
@@ -349,6 +360,21 @@ if (OPENMP_FOUND)
   target_compile_options (${fftw3_lib}_omp PRIVATE ${OpenMP_C_FLAGS})
 endif ()
 
+if (MPI_FOUND)
+  add_library (${fftw3_lib}_mpi ${fftw_mpi_SOURCE})
+  target_link_libraries (${fftw3_lib}_mpi ${fftw3_lib})
+  include_directories(${MPI_INCLUDE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/api)
+  list (APPEND subtargets ${fftw3_lib}_mpi)
+  if(MPI_COMPILE_FLAGS)
+    set_target_properties(${fftw3_lib}_mpi PROPERTIES
+      COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
+  endif()
+  if(MPI_LINK_FLAGS)
+    set_target_properties(${fftw3_lib}_mpi PROPERTIES
+      LINK_FLAGS "${MPI_LINK_FLAGS}")
+  endif()
+endif()
+
 foreach(subtarget ${subtargets})
   set_target_properties (${subtarget} PROPERTIES SOVERSION 3.5.7 VERSION 3)
   install (TARGETS ${subtarget}
@@ -366,6 +392,9 @@ install (FILES api/fftw3.h DESTINATION include)
 if (EXISTS api/fftw3.f)
   install (FILES api/fftw3.f DESTINATION include)
 endif ()
+if (MPI_FOUND)
+  install (FILES mpi/fftw3-mpi.h DESTINATION include)
+endif()
 
 if (BUILD_TESTS)
 
